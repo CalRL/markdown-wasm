@@ -1,15 +1,14 @@
-pub struct Heading {
+
+use crate::parser::{Parse};
+use crate::html::{escape_html, ToHtml};
+
+#[derive(Debug)]
+pub struct Heading<'a> {
     level: HeadingLevel,
-    text: String,
+    text: &'a str,
 }
 
-impl Heading {
-    fn parse(line: &str) -> Option<Heading> {
-        parse(line)
-    }
-}
-
-fn parse(input: &str) -> Option<Heading> {
+fn parse_heading(input: &str) -> Option<Heading> {
     let trimmed: &str = input.trim();
     let (hashes, text) = trimmed.split_once(' ')?;
     let level: HeadingLevel = match hashes {
@@ -24,6 +23,7 @@ fn parse(input: &str) -> Option<Heading> {
     })
 }
 
+#[derive(Debug)]
 pub enum HeadingLevel {
     H1,
     H2,
@@ -48,5 +48,32 @@ impl TryFrom<&str> for HeadingLevel {
         };
 
         Ok(level)
+    }
+}
+
+impl<'a> Parse<'a> for Heading<'a> {
+    fn parse(input: &'a str) -> Option<Self>
+    where
+        Self: Sized
+    {
+        parse_heading(input)
+    }
+}
+
+impl<'a> ToHtml for Heading<'a> {
+    fn to_html(&self) -> String {
+        let tag = match self.level {
+            HeadingLevel::H1 => "h1",
+            HeadingLevel::H2 => "h2",
+            HeadingLevel::H3 => "h3",
+            HeadingLevel::H4 => "h4",
+            HeadingLevel::H5 => "h5",
+            HeadingLevel::H6 => "h6",
+        };
+
+        format!(
+            "<{tag}>{}</{tag}>",
+            escape_html(self.text)
+        )
     }
 }
