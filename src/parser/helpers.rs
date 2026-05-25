@@ -75,7 +75,7 @@ pub(crate) fn handle_code_block<'a>(input: &'a str, lines: &Vec<IndexedLine>, li
         return;
     };
 
-    let content_start = lines[*i].end;
+    let content_start = lines[*i + 1].start;
     *i += 1;
     let mut closing_start = input.len();
 
