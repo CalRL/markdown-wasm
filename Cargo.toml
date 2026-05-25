@@ -4,9 +4,9 @@ version = "0.1.2"
 edition = "2024"
 description = ""
 repository = "https://github.com/calrl/markdown-wasm"
-
+license = "MIT"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
+wasm-bindgen = "0.2.121"
