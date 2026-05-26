@@ -2,7 +2,46 @@
 
 Small Rust + wasm markdown parser.
 
-## GFM Feature Checklist
+## Install
+
+Requirements:
+
+- Rust and Cargo
+- Node.js (or Bun)
+- wasm-pack
+
+Install wasm-pack:
+
+```bash
+cargo install wasm-pack
+```
+
+## Build and run locally
+
+Build the wasm package:
+
+```bash
+npm run build
+```
+
+This generates the TS/WASM bindings in `pkg/`.
+
+## Usage
+
+The module comes with one function: parse_markdown(input: string)
+
+```js
+import { parse_markdown } from "markdown_wasm";
+
+await init();
+
+const input = `# Hello`
+const html = parse_markdown(input);
+
+console.log(html);
+```
+
+## Feature Checklist
 
 ### Core Markdown
 
