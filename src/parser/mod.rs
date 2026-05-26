@@ -53,10 +53,12 @@ impl<'a> ToHtml for Block<'a> {
 pub(crate) fn parse_blocks<'a>(input: &'a str) -> Vec<Block<'a>> {
     let mut blocks = Vec::new();
     let lines = indexed_lines(input);
+    let n = lines.len();
     let mut i = 0;
 
-    while i < lines.len() {
-        let line = lines[i].text;
+    while i < n {
+        let line_info = &lines[i];
+        let line = line_info.text;
         match identify_block_type(line) {
             BlockType::Blank => {
                 helpers::handle_empty(&mut i);
@@ -70,7 +72,7 @@ pub(crate) fn parse_blocks<'a>(input: &'a str) -> Vec<Block<'a>> {
             BlockType::UnorderedList => {
                 let mut items = Vec::new();
 
-                while i < lines.len() {
+                while i < n {
                     let Some(start) = parse_unordered_start(lines[i].text) else {
                         break;
                     };
@@ -79,8 +81,9 @@ pub(crate) fn parse_blocks<'a>(input: &'a str) -> Vec<Block<'a>> {
                     let mut content_end = lines[i].end;
                     i += 1;
 
-                    while i < lines.len() {
-                        let next_line = lines[i].text;
+                    while i < n {
+                        let next_line_info = &lines[i];
+                        let next_line = next_line_info.text;
                         let next_indent = count_leading_spaces(next_line);
 
                         if is_unordered_list_item(next_line) || is_ordered_list_item(next_line) {
@@ -88,13 +91,13 @@ pub(crate) fn parse_blocks<'a>(input: &'a str) -> Vec<Block<'a>> {
                         }
 
                         if next_line.trim().is_empty() {
-                            content_end = lines[i].end;
+                            content_end = next_line_info.end;
                             i += 1;
                             continue;
                         }
 
                         if next_indent > start.indent {
-                            content_end = lines[i].end;
+                            content_end = next_line_info.end;
                             i += 1;
                             continue;
                         }
@@ -114,7 +117,7 @@ pub(crate) fn parse_blocks<'a>(input: &'a str) -> Vec<Block<'a>> {
             BlockType::OrderedList => {
                 let mut items = Vec::new();
 
-                while i < lines.len() {
+                while i < n {
                     let Some(start) = parse_ordered_start(lines[i].text) else {
                         break;
                     };
@@ -123,8 +126,9 @@ pub(crate) fn parse_blocks<'a>(input: &'a str) -> Vec<Block<'a>> {
                     let mut content_end = lines[i].end;
                     i += 1;
 
-                    while i < lines.len() {
-                        let next_line = lines[i].text;
+                    while i < n {
+                        let next_line_info = &lines[i];
+                        let next_line = next_line_info.text;
                         let next_indent = count_leading_spaces(next_line);
 
                         if is_ordered_list_item(next_line) || is_unordered_list_item(next_line) {
@@ -132,13 +136,13 @@ pub(crate) fn parse_blocks<'a>(input: &'a str) -> Vec<Block<'a>> {
                         }
 
                         if next_line.trim().is_empty() {
-                            content_end = lines[i].end;
+                            content_end = next_line_info.end;
                             i += 1;
                             continue;
                         }
 
                         if next_indent > start.indent {
-                            content_end = lines[i].end;
+                            content_end = next_line_info.end;
                             i += 1;
                             continue;
                         }
@@ -203,22 +207,40 @@ struct OrderedItemStart {
 }
 
 fn parse_unordered_start(line: &str) -> Option<UnorderedItemStart> {
+    let bytes = line.as_bytes();
+    let mut idx = 0;
+
+    while idx < bytes.len() && bytes[idx] == b' ' {
+        idx += 1;
+    }
+
+    if idx >= bytes.len() {
+        return None;
+    }
+
+    let marker_byte = bytes[idx];
+    if marker_byte != b'-' && marker_byte != b'*' && marker_byte != b'+' {
+        return None;
+    }
+    let marker = marker_byte as char;
+
+    idx += 1;
+    if idx >= bytes.len() {
+        return None;
+    }
+
+    let ws = bytes[idx];
+    if ws != b' ' && ws != b'\t' {
+        return None;
+    }
+
+    idx += 1;
+    while idx < bytes.len() && (bytes[idx] == b' ' || bytes[idx] == b'\t') {
+        idx += 1;
+    }
+
     let indent = count_leading_spaces(line);
-    let trimmed = line.trim_start_matches(' ');
-    let mut chars = trimmed.chars();
-
-    let marker = chars.next()?;
-    if marker != '-' && marker != '*' && marker != '+' {
-        return None;
-    }
-
-    let ws = chars.next()?;
-    if ws != ' ' && ws != '\t' {
-        return None;
-    }
-
-    let marker_offset = indent + marker.len_utf8() + ws.len_utf8();
-    let content_offset = marker_offset + trimmed[marker_offset - indent..].chars().take_while(|c| *c == ' ' || *c == '\t').map(char::len_utf8).sum::<usize>();
+    let content_offset = idx;
 
     Some(UnorderedItemStart {
         indent,
@@ -228,28 +250,44 @@ fn parse_unordered_start(line: &str) -> Option<UnorderedItemStart> {
 }
 
 fn parse_ordered_start(line: &str) -> Option<OrderedItemStart> {
+    let bytes = line.as_bytes();
+    let mut idx = 0;
+
+    while idx < bytes.len() && bytes[idx] == b' ' {
+        idx += 1;
+    }
+
+    let number_start = idx;
+    while idx < bytes.len() && bytes[idx].is_ascii_digit() {
+        idx += 1;
+    }
+
+    if idx == number_start {
+        return None;
+    }
+
+    if idx >= bytes.len() || bytes[idx] != b'.' {
+        return None;
+    }
+
+    let number = line[number_start..idx].parse::<usize>().ok()?;
+
+    idx += 1;
+    if idx >= bytes.len() || (bytes[idx] != b' ' && bytes[idx] != b'\t') {
+        return None;
+    }
+
+    idx += 1;
+    while idx < bytes.len() && (bytes[idx] == b' ' || bytes[idx] == b'\t') {
+        idx += 1;
+    }
+
     let indent = count_leading_spaces(line);
-    let trimmed = line.trim_start_matches(' ');
-    let dot_index = trimmed.find('.')?;
-    let number_part = &trimmed[..dot_index];
-
-    if number_part.is_empty() || !number_part.chars().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
-
-    let rest = &trimmed[dot_index + 1..];
-    if !rest.starts_with(' ') && !rest.starts_with('\t') {
-        return None;
-    }
-
-    let number = number_part.parse::<usize>().ok()?;
-    let base = indent + dot_index + 1;
-    let whitespace_len = rest.chars().take_while(|c| *c == ' ' || *c == '\t').map(char::len_utf8).sum::<usize>();
 
     Some(OrderedItemStart {
         indent,
         number,
-        content_offset: base + whitespace_len,
+        content_offset: idx,
     })
 }
 
