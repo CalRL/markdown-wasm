@@ -16,6 +16,10 @@ pub fn parse_markdown(input: &str) -> String {
         .collect::<String>()
 }
 
+pub fn parse_blocks_only(input: &str) -> usize {
+    parser::parse_blocks(input).len()
+}
+
 #[derive(Debug)]
 enum Block<'a> {
     Heading(Heading<'a>),
