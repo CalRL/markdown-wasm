@@ -10,10 +10,3 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2.121"
-
-[dev-dependencies]
-criterion = "0.8.2"
-
-[[bench]]
-name = "markdown"
-harness = false
