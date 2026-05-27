@@ -50,6 +50,14 @@ console.log(html);
 - [x] Unordered lists
 - [x] Ordered lists
 - [x] Fenced code blocks (``` and ~~~)
+- [ ] Blockquotes
+- [ ] Thematic breaks (`---`, `***`, `___`)
+- [ ] Inline links (`[text](url)`)
+- [ ] Emphasis (`*italic*`, `**bold**`)
+- [ ] Images (`![alt](src)`)
+- [ ] Inline code spans (`` `code` ``)
+- [ ] Autolinks (`<https://example.com>`)
+- [ ] Backslash escapes (`\*`, `\[`, etc.)
 - [x] HTML escaping in rendered output
 
 ### GitHub Flavored Markdown (GFM)
@@ -63,12 +71,9 @@ console.log(html);
 
 ### Other Common Markdown Features
 
-- [ ] Blockquotes
-- [ ] Inline code
-- [ ] Emphasis (`*italic*`, `**bold**`)
-- [ ] Links (`[text](url)`)
-- [ ] Images (`![alt](src)`)
-- [ ] Horizontal rules (`---`)
+- [ ] Setext headings (`Heading` + `===`)
+- [ ] Indented code blocks (4-space)
+- [ ] Reference-style links (`[text][id]`)
 
 ## Benchmarks
 Using @rsms/markdown-wasm's bench suite for comparison.
