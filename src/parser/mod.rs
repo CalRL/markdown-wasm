@@ -50,122 +50,43 @@ impl<'a> ToHtml for Block<'a> {
     }
 }
 
-pub(crate) fn parse_blocks<'a>(input: &'a str) -> Vec<Block<'a>> {
-    let mut blocks = Vec::new();
-    let lines = indexed_lines(input);
-    let n = lines.len();
-    let mut i = 0;
+pub struct BlockParser<'a> {
+    input: &'a str,
+    lines: Vec<IndexedLine<'a>>,
+    blocks: Vec<Block<'a>>,
+    line_index: usize,
+    lines_len: usize
+}
 
-    while i < n {
-        let line_info = &lines[i];
+impl<'a> BlockParser<'a> {
+    
+}
+
+pub(crate) fn parse_blocks<'a>(input: &'a str) -> Vec<Block<'a>> {
+    let lines = indexed_lines(input);
+    let lines_len = lines.len();
+    let n = lines.len();
+    let mut state: BlockParser = BlockParser {
+        input,
+        lines,
+        blocks: Vec::new(),
+        line_index: 0,
+        lines_len,
+    };
+    while state.line_index < n {
+        let line_info = &state.lines[state.line_index];
         let line = line_info.text;
         match identify_block_type(line) {
-            BlockType::Blank => {
-                helpers::handle_empty(&mut i);
-            }
-            BlockType::CodeBlock => {
-                helpers::handle_code_block(input, &lines, line, &mut blocks, &mut i);
-            }
-            BlockType::Heading => {
-                helpers::handle_heading(line, &mut blocks, &mut i)
-            }
-            BlockType::UnorderedList => {
-                let mut items = Vec::new();
-
-                while i < n {
-                    let Some(start) = parse_unordered_start(lines[i].text) else {
-                        break;
-                    };
-
-                    let content_start = lines[i].start + start.content_offset;
-                    let mut content_end = lines[i].end;
-                    i += 1;
-
-                    while i < n {
-                        let next_line_info = &lines[i];
-                        let next_line = next_line_info.text;
-                        let next_indent = count_leading_spaces(next_line);
-
-                        if is_unordered_list_item(next_line) || is_ordered_list_item(next_line) {
-                            break;
-                        }
-
-                        if next_line.trim().is_empty() {
-                            content_end = next_line_info.end;
-                            i += 1;
-                            continue;
-                        }
-
-                        if next_indent > start.indent {
-                            content_end = next_line_info.end;
-                            i += 1;
-                            continue;
-                        }
-
-                        break;
-                    }
-
-                    items.push(ListItem {
-                        indent: start.indent,
-                        marker: start.marker,
-                        content: input[content_start..content_end].trim_end(),
-                    });
-                }
-
-                blocks.push(Block::UnorderedList(items));
-            }
-            BlockType::OrderedList => {
-                let mut items = Vec::new();
-
-                while i < n {
-                    let Some(start) = parse_ordered_start(lines[i].text) else {
-                        break;
-                    };
-
-                    let content_start = lines[i].start + start.content_offset;
-                    let mut content_end = lines[i].end;
-                    i += 1;
-
-                    while i < n {
-                        let next_line_info = &lines[i];
-                        let next_line = next_line_info.text;
-                        let next_indent = count_leading_spaces(next_line);
-
-                        if is_ordered_list_item(next_line) || is_unordered_list_item(next_line) {
-                            break;
-                        }
-
-                        if next_line.trim().is_empty() {
-                            content_end = next_line_info.end;
-                            i += 1;
-                            continue;
-                        }
-
-                        if next_indent > start.indent {
-                            content_end = next_line_info.end;
-                            i += 1;
-                            continue;
-                        }
-
-                        break;
-                    }
-
-                    items.push(OrderedListItem {
-                        indent: start.indent,
-                        number: start.number,
-                        content: input[content_start..content_end].trim_end(),
-                    });
-                }
-
-                blocks.push(Block::OrderedList(items));
-            }
-            BlockType::Paragraph => {
-                helpers::handle_paragraph(input, &lines, &mut blocks, &mut i)
-            }
+            BlockType::Blank => helpers::handle_empty(&mut state.line_index),
+            BlockType::CodeBlock => helpers::handle_code_block(&mut state),
+            BlockType::Heading => helpers::handle_heading(line, &mut state.blocks, &mut state.line_index),
+            BlockType::UnorderedList => helpers::handle_unordered_list(&mut state),
+            BlockType::OrderedList => helpers::handle_ordered_list(&mut state),
+            BlockType::Paragraph => helpers::handle_paragraph(&mut state)
         }
     }
 
-    blocks
+    state.blocks
 }
 
 fn parse_fence_start(line: &str) -> Option<(char, Option<&str>)> {

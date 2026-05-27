@@ -1,6 +1,6 @@
 use crate::{Block, BlockType, Heading};
 use crate::markdown::list::{ListItem, OrderedListItem};
-use crate::parser::{is_matching_fence_end, parse_fence_start, IndexedLine, Parse};
+use crate::parser::{count_leading_spaces, is_matching_fence_end, parse_fence_start, parse_ordered_start, parse_unordered_start, BlockParser, IndexedLine, Parse};
 
 pub(crate) fn is_heading(line: &str) -> bool {
     Heading::parse(line).is_some()
@@ -45,57 +45,56 @@ pub(crate) fn identify_block_type(line: &str) -> BlockType {
 }
 
 
-pub(crate) fn handle_empty(mut i: &mut usize) {
-    *i += 1;
+pub(crate) fn handle_empty(state: &mut usize) {
+    *state += 1;
 }
 
-pub(crate) fn handle_paragraph<'a>(input: &'a str, lines: &Vec<IndexedLine>, mut blocks: &mut Vec<Block<'a>>, i: &mut usize) {
-    let paragraph_start = lines[*i].start;
-    let mut paragraph_end = lines[*i].end;
-    *i += 1;
+pub(crate) fn handle_paragraph<'a>(state: &mut BlockParser) {
+    let paragraph_start = state.lines[state.line_index].start;
+    let mut paragraph_end = state.lines[state.line_index].end;
+    state.line_index += 1;
 
-    while *i < lines.len() {
-        let next_line = lines[*i].text;
+    while state.line_index < state.lines_len {
+        let next_line = state.lines[state.line_index].text;
         if !matches!(identify_block_type(next_line), BlockType::Paragraph) {
             break;
         }
 
-        paragraph_end = lines[*i].end;
-        *i += 1;
+        paragraph_end = state.lines[state.line_index].end;
+        state.line_index += 1;
     }
 
-    blocks.push(Block::Paragraph(input[paragraph_start..paragraph_end].trim()));
+    state.blocks.push(Block::Paragraph(state.input[paragraph_start..paragraph_end].trim()));
 }
-pub(crate) fn handle_unordered_list() {}
-pub(crate) fn handle_ordered_list() {}
-pub(crate) fn handle_code_block<'a>(input: &'a str, lines: &Vec<IndexedLine>, line: &'a str, mut blocks: &mut Vec<Block<'a>>, i: &mut usize) {
 
-    let Some((fence, language)) = parse_fence_start(line) else {
-        *i += 1;
+pub(crate) fn handle_code_block<'a>(state: &mut BlockParser) {
+
+    let Some((fence, language)) = parse_fence_start(&state.lines[state.line_index].text) else {
+        state.line_index += 1;
         return;
     };
 
-    let content_start = lines[*i + 1].start;
-    *i += 1;
-    let mut closing_start = input.len();
+    let content_start = state.lines[state.line_index + 1].start;
+    state.line_index += 1;
+    let mut closing_start = state.input.len();
 
-    while *i < lines.len() {
-        let code_line = lines[*i].text;
+    while state.line_index < state.lines_len {
+        let code_line = state.lines[state.line_index].text;
         if is_matching_fence_end(code_line, fence) {
-            closing_start = lines[*i].start;
-            *i += 1;
+            closing_start = state.lines[state.line_index].start;
+            state.line_index += 1;
             break;
         }
-        *i += 1;
+        state.line_index += 1;
     }
 
-    let content = if content_start <= closing_start {
-        &input[content_start..closing_start]
+    let content: &str = if content_start <= closing_start {
+        &state.input[content_start..closing_start]
     } else {
         ""
     };
 
-    blocks.push(Block::CodeBlock { language, content });
+    state.blocks.push(Block::CodeBlock { language, content });
 }
 
 pub(crate) fn handle_heading<'a>(line: &'a str, mut blocks: &mut Vec<Block<'a>>, i: &mut usize) {
@@ -103,4 +102,96 @@ pub(crate) fn handle_heading<'a>(line: &'a str, mut blocks: &mut Vec<Block<'a>>,
         blocks.push(Block::Heading(heading));
     }
     *i += 1;
+}
+
+pub(crate) fn handle_ordered_list(state: &mut BlockParser) {
+    let mut items = Vec::new();
+
+    while state.line_index < state.lines_len {
+        let Some(start) = parse_ordered_start(state.lines[state.line_index].text) else {
+            break;
+        };
+
+        let content_start = state.lines[state.line_index].start + start.content_offset;
+        let mut content_end = state.lines[state.line_index].end;
+        state.line_index += 1;
+
+        while state.line_index < state.lines_len {
+            let next_line_info = &state.lines[state.line_index];
+            let next_line = next_line_info.text;
+            let next_indent = count_leading_spaces(next_line);
+
+            if is_ordered_list_item(next_line) || is_unordered_list_item(next_line) {
+                break;
+            }
+
+            if next_line.trim().is_empty() {
+                content_end = next_line_info.end;
+                state.line_index += 1;
+                continue;
+            }
+
+            if next_indent > start.indent {
+                content_end = next_line_info.end;
+                state.line_index += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        items.push(OrderedListItem {
+            indent: start.indent,
+            number: start.number,
+            content: state.input[content_start..content_end].trim_end(),
+        });
+    }
+
+    state.blocks.push(Block::OrderedList(items));
+}
+
+pub(crate) fn handle_unordered_list(state: &mut BlockParser) {
+    let mut items = Vec::new();
+
+    while state.line_index < state.lines_len {
+        let Some(start) = parse_unordered_start(state.lines[state.line_index].text) else {
+            break;
+        };
+
+        let content_start = state.lines[state.line_index].start + start.content_offset;
+        let mut content_end = state.lines[state.line_index].end;
+        state.line_index += 1;
+
+        while state.line_index < state.lines_len {
+            let next_line_info = &state.lines[state.line_index];
+            let next_line = next_line_info.text;
+            let next_indent = count_leading_spaces(next_line);
+
+            if is_unordered_list_item(next_line) || is_ordered_list_item(next_line) {
+                break;
+            }
+
+            if next_line.trim().is_empty() {
+                content_end = next_line_info.end;
+                state.line_index += 1;
+                continue;
+            }
+
+            if next_indent > start.indent {
+                content_end = next_line_info.end;
+                state.line_index += 1;
+                continue;
+            }
+
+            break;
+        }
+
+        items.push(ListItem {
+            indent: start.indent,
+            marker: start.marker,
+            content: state.input[content_start..content_end].trim_end(),
+        });
+    }
+
+    state.blocks.push(Block::UnorderedList(items));
 }
