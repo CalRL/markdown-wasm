@@ -69,3 +69,31 @@ console.log(html);
 - [ ] Links (`[text](url)`)
 - [ ] Images (`![alt](src)`)
 - [ ] Horizontal rules (`---`)
+
+## Benchmarks
+Using @rsms/markdown-wasm's bench suite for comparison.
+Ran on Window 11 Version 10.0.26200 Build 26200.
+Ran on an AMD 7800X3D.
+
+
+#### Average ops/second
+
+Ops/second represents how many times a library is able to parse markdown and render HTML
+during a second, on average across all sample files.
+
+![](benches/results/avg-ops-per-sec.svg)
+
+#### Average throughput
+
+Throughput is the average amount of markdown data processed during a second while both parsing
+and rendering to HTML. The statistics does not include HTML generated but only bytes of markdown
+source text parsed.
+
+![](benches/results/avg-throughput.svg)
+
+#### Min–max parse time
+
+This graph shows the spread between the fastest and slowest parse-and-render operations
+for each library. Lower numbers are better.
+
+![](benches/results/minmax-parse-time.svg)
