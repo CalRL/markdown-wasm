@@ -1,10 +1,11 @@
 pub mod helpers;
+pub mod inline;
+
+use crate::html::{escape_html, ToHtml};
+use crate::parser::helpers::identify_block_type;
+use crate::parser::inline::parse_inlines;
 use crate::Block;
 use crate::BlockType;
-use crate::markdown::heading::Heading;
-use crate::markdown::list::{ListItem, OrderedListItem};
-use crate::html::{ToHtml, escape_html};
-use crate::parser::helpers::{identify_block_type, is_ordered_list_item, is_unordered_list_item};
 
 pub trait Parse<'a> {
     fn parse(input: &'a str) -> Option<Self>
@@ -15,14 +16,14 @@ impl<'a> ToHtml for Block<'a> {
     fn to_html(&self) -> String {
         match self {
             Block::Heading(heading) => heading.to_html(),
-            Block::Paragraph(text) => format!("<p>{}</p>", text),
+            Block::Paragraph(text) => format!("<p>{}</p>", parse_inlines(text)),
             Block::UnorderedList(items) => {
                 let items_html = items
                     .iter()
                     .map(|item| item.to_html())
                     .collect::<String>();
 
-                format!("<ul>{}</ul>", items_html)
+                format!("<ul>{}</ul>", (items_html))
             }
 
             Block::OrderedList(items) => {

@@ -1,6 +1,7 @@
 
 use crate::parser::{Parse};
-use crate::html::{escape_html, ToHtml};
+use crate::html::ToHtml;
+use crate::parser::inline::parse_inlines;
 
 #[derive(Debug)]
 pub struct Heading<'a> {
@@ -76,7 +77,7 @@ impl<'a> ToHtml for Heading<'a> {
 
         format!(
             "<{tag}>{}</{tag}>",
-            escape_html(self.text)
+            parse_inlines(self.text)
         )
     }
 }

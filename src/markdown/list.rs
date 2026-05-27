@@ -1,5 +1,6 @@
 use crate::html::{escape_html, ToHtml};
 use crate::parser::{Parse};
+use crate::parser::inline::parse_inlines;
 
 #[derive(Debug)]
 pub struct ListItem<'a> {
@@ -35,13 +36,13 @@ impl<'a> Parse<'a> for OrderedListItem<'a> {
 
 impl<'a> ToHtml for ListItem<'a> {
     fn to_html(&self) -> String {
-        format!("<li>{}</li>", escape_html(self.content))
+        format!("<li>{}</li>", parse_inlines(self.content))
     }
 }
 
 impl<'a> ToHtml for OrderedListItem<'a> {
     fn to_html(&self) -> String {
-        format!("<li>{}</li>", escape_html(self.content))
+        format!("<li>{}</li>", parse_inlines(self.content))
     }
 }
 

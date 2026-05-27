@@ -6,6 +6,7 @@ pub mod html;
 use wasm_bindgen::prelude::*;
 use markdown::heading::Heading;
 use crate::markdown::list::{ListItem, OrderedListItem};
+use crate::html::escape_html;
 use crate::html::ToHtml;
 
 #[wasm_bindgen]
@@ -14,6 +15,11 @@ pub fn parse_markdown(input: &str) -> String {
         .into_iter()
         .map(|block| block.to_html())
         .collect::<String>()
+}
+
+#[wasm_bindgen]
+pub fn escape_html_text(input: &str) -> String {
+    escape_html(input)
 }
 
 pub fn parse_blocks_only(input: &str) -> usize {
@@ -32,7 +38,7 @@ enum Block<'a> {
     },
 }
 
-enum BlockType {
+pub(crate) enum BlockType {
     Blank,
     Heading,
     Paragraph,
@@ -149,5 +155,24 @@ mod tests {
         let html = parse_markdown(input);
 
         assert_eq!(html, "<p>para one line 1\npara one line 2</p><p>para two</p>");
+    }
+
+    #[test]
+    fn parses_inline_code_span_in_paragraph() {
+        let input = "Use `cargo test` locally.";
+        let html = parse_markdown(input);
+
+        assert_eq!(html, "<p>Use <code>cargo test</code> locally.</p>");
+    }
+
+    #[test]
+    fn parses_inline_link_in_paragraph() {
+        let input = "Visit [Rust](https://www.rust-lang.org).";
+        let html = parse_markdown(input);
+
+        assert_eq!(
+            html,
+            "<p>Visit <a href=\"https://www.rust-lang.org\">Rust</a>.</p>"
+        );
     }
 }
